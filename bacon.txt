@@ -1,0 +1,5 @@
+WITH RECURSIVE below_here(x) as (select id from snmpdata where id = 3 
+ union all
+ select id from snmpdata, below_here
+ where snmpdata.parent_id = below_here.x)
+ select id, parent_id, oid, oid_name from snmpdata where id in below_here

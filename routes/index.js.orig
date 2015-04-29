@@ -1,0 +1,59 @@
+var express = require('express');
+var sqlite  = require('sqlite3').verbose();
+var util    = require('util')
+var db      = new sqlite.Database('snmp.db');
+var router = express.Router();
+
+/* GET home page. */
+router.get('/', function(req, res, next) {
+  res.render('index', { title: 'Express' });
+});
+router.get('/query/:id', function(req, res, next) {
+    if (req.params.id == "0") {
+       db.all('select id from snmpdata where parent_id is null', function(err, rows) {
+          console.log(util.inspect(rows[0]));
+          build_list(res, rows[0].id);
+       });
+    }
+    else {
+      build_list(res, req.params.id);
+    }
+});
+
+function build_list(res, target_id) {
+    main_nodes = {oid_name:'', children:[]};
+    db.serialize(function() {
+      var query = "with recursive snmpparent(id, parent_id, oid, oid_name, child_flag) AS (select id, parent_id, oid, oid_name, 1 as child_flag from snmpdata where id=" + 
+	    target_id + " UNION ALL SELECT snmpdata.id, snmpdata.parent_id, snmpdata.oid, snmpdata.oid_name, 1 as child_flag from snmpdata,snmpparent where snmpdata.id = snmpparent.parent_id) SELECT * from snmpparent;"
+      
+      db.all(query, function(err,rows) {
+          var prevobj={children: [], parent_id: rows[0].parent_id, id: rows[0].id, oid_name: rows[0].oid_name, oid: rows[0].oid};
+	  var placeholder = prevobj;
+	  console.log(rows.length);
+          for (var i=1; i < rows.length; i++) {
+            console.log(">>>>>" + util.inspect(rows[i]));
+            //var newobj={children: [], oid_name: rows[i].oid_name, oid: rows[i].oid};
+            var newobj=rows[i];
+	    newobj.children = [];
+	    //{children: [], oid_name: rows[i].oid_name, oid: rows[i].oid};
+	    newobj.children.push(prevobj);
+	    console.log(prevobj);
+	    prevobj = newobj
+	  }
+          var query = 'select a.parent_id as parent_id, a.oid as oid, a.id as id, a.oid_name as oid_name, (max(b.id) is not null) as child_flag ' +
+	      'from snmpdata a left join snmpdata b on b.parent_id = a.id where a.parent_id ="' +
+	      target_id + '" group by a.id;'
+	  console.log(query)
+          db.all(query , function(err,rows) {
+            for (var i=0; i< rows.length;i++) {
+              console.log(util.inspect(rows[i]));
+              placeholder.children.push(rows[i]);
+            }
+  	    res.json(prevobj);
+          });
+	  console.log(prevobj);
+      });
+    });
+}
+
+module.exports = router;
