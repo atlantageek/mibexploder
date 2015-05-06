@@ -5,6 +5,7 @@
 
 <!-- Optional theme -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+<link rel="stylesheet" href="stylesheets/jqtree.css"
 
 <!-- Latest compiled and minified JavaScript -->
 <body>
@@ -17,11 +18,11 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="#">Project name</a>
+          <a class="navbar-brand" href="#">Mib.world</a>
         </div>
         <div id="navbar" class="collapse navbar-collapse">
           <ul class="nav navbar-nav">
-            <li class="active"><a href="#">Home</a></li>
+            <li class="active"><a href="#">Mib Explorer</a></li>
             <li><a href="#about">About</a></li>
             <li><a href="#contact">Contact</a></li>
           </ul>
@@ -29,13 +30,21 @@
       </div>
     </nav>
 
-    <div class="container-fluid" >
+    <div class="container-fluid" style="padding-top:80px;">
 <div class="row">
-<div class="col-md-5" id="tree1">
+<div class="col-md-5">
+  <form class="form-inline">
+	  <div class="form-group">
+	      <label for="oid_search">Oid for Search</label>
+              <input type="text" class="form-control" id="oid_search" placeholder="Ex: 1.3.6.1.4.1">
+	  </div>
+  </form>
+  <div id="tree1" data-url="/query"></div>
 </div>
-<div class="col-md-7" style="padding-top:50px">
+<div class="col-md-5" style="padding-top:50px">
   <h3 id="oid_name"></h3>
   <h4 id="oid"></h4>
+  <div id="description"></div>
   <span id="oid_description"></span>
 </div>
 </div>
@@ -46,25 +55,35 @@
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
 
 <script>
-var data = [
-    {
-        label: 'node1',
-        children: [
-            { label: 'child1' },
-            { label: 'child2' }
-        ]
-    },
-    {
-        label: 'node2',
-        children: [
-            { label: 'child3' }
-        ]
-    }
-];
+  function loadSubtree(value) {
+	  $('#tree1').tree('loadDataFromUrl','/uptree?oid='+value);
+  }
   $(function() {
-    $('#tree1').tree({
-      data: data
-    });
-  });
+    $('.form-inline').on("keyup keypress", function(e) {
+      var code = e.keyCode || e.which; 
+      if (code  == 13) {               
+          loadSubtree($('#oid_search').val())
+          e.preventDefault();
+          return false;
+      } });
+      $('#oid_search').change(function() {
+          loadSubtree($('#oid_search').val())
+      });
+      $('#tree1').tree({
+      });
+  // bind 'tree.click' event
+  $('#tree1').bind(
+      'tree.click',
+      function(event) {
+          // The clicked node is 'event.node'
+          var node = event.node;
+          $.get("/details", {node_id: node.id}).done(function(data) {
+            $("#oid").text(data.oid);
+            $("#oid_name").text(data.oid_name);
+            $("#description").text(data.description);
+	  });
+      }
+  );
+});
 </script>
 

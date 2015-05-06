@@ -8,53 +8,83 @@ var router = express.Router();
 router.get('/', function(req, res, next) {
   res.render('index', { title: 'Express' });
 });
+
+router.get('/details', function(req, res, next) {
+  db.serialize(function() {
+    db.all("select * from snmpdata where id=" + req.query.node_id, function(err,rows) {
+      res.json(rows[0]);
+
+    });
+  });
+});
+
 router.get('/query', function(req, res, next) {
-    if (req.params.node ) {
-       db.all('select id from snmpdata where parent_id is null', function(err, rows) {
-          console.log(util.inspect(rows[0]));
-          build_list(res, rows[0].id);
-       });
+    if (!req.query.node ) {
+          build_list(res, null);
     }
     else {
-	build_list(res, req.params.node)
+	build_list(res, req.query.node)
       }
+});
+router.get('/uptree', function(req, res, next) {
+    var oid = req.query.oid 
+     query_get_id = "select a.id as id , a.oid_name || \" [\" || a.oid || \"]\" as label, a.oid as oid, count(b.oid_name) > 0  as load_on_demand from snmpdata a left join snmpdata b on a.id = b.parent_id where a.parent_id = " + target_id +" group by a.id,label, a.oid"
+    db.all(query_get_id, function(err,rows) {
+	  backout(res, rows[0]['id']);
+    });
 });
 
 function build_list(res, target_id) {
     node_list = {};
     node_heirarchy = {};
+    if (target_id == null) {
+      query = "select a.id as id , a.oid_name || \" [\" || a.oid || \"]\" as label, a.oid as oid, count(*) > 0  as load_on_demand from snmpdata a left join snmpdata b on a.id = b.parent_id where a.parent_id is null group by a.id, label, a.oid"
+    }
+    else {
+      query = "select a.id as id , a.oid_name || \" [\" || a.oid || \"]\" as label, a.oid as oid, count(b.oid_name) > 0  as load_on_demand from snmpdata a left join snmpdata b on a.id = b.parent_id where a.parent_id = " + target_id +" group by a.id,label, a.oid"
+    }
+    db.serialize(function() { 
 
-    db.serialize(function() {
-      var query = "WITH RECURSIVE below_here(id,depth) as (" +
-	"     values(" + target_id + ",0)" +
-	"      union all" +
-	"       select snmpdata.id, below_here.depth + 1 from snmpdata join below_here" +
-	"        on snmpdata.parent_id = below_here.id where below_here.depth < 2)" +
-	"	 select id, parent_id, oid, oid_name from snmpdata where id in" +
-	"     (select id from below_here);" 
+      db.all(query, function(err,rows) {
+        var result = [];
+	for(i=0;i<rows.length;i++) {
+          var new_row = {};
+	  new_row["load_on_demand"] = (rows[i]["load_on_demand"] == 1);
+	  new_row["id"] = rows[i]["id"];
+	  new_row["label"] = rows[i]["label"];
+	  new_row["oid"] = rows[i]["oid"];
+          result.push(new_row);
+	}
+       console.log(util.inspect(result));
+       console.log(util.inspect(err));
+        res.json(result);
+      }); 
+    }); 
+}
+function backout(res, target_id) {
+    node_list = {};
+    node_heirarchy = {};
 
-      //var query = "WITH RECURSIVE below_here(x) as (" +
-	//    "select id from snmpdata where id = "  + target_id + 
-	//    " UNION ALL " + 
-	//    " select id from snmpdata, below_here " +
-	//    " where snmpdata.parent_id = below_here.x)" +
-        //    " select id, parent_id, oid, oid_name, 1 as child_flag from snmpdata where id in below_here;"
-      //var query = "select id, parent_id, oid, oid_name, 1 as child_flag from snmpdata where id = "  + target_id + " order by parent_id"
+    query = "WITH RECURSIVE above_here(x) as (select parent_id from snmpdata where id = \"" + target_id  + "\" union all select parent_id from snmpdata, above_here where snmpdata.id = above_here.x) select id, parent_id, oid, oid_name from snmpdata where id in above_here; "
+    db.serialize(function() { 
+
       console.log(query)
       db.all(query, function(err,rows) {
+        var result = {};
+	var curr_row=result;
+	for(i=0;i<rows.length;i++) {
+          var new_row={};
+	  curr_row["load_on_demand"] = (rows[i]["load_on_demand"] == 1);
+	  curr_row["id"] = rows[i]["id"];
+	  curr_row["label"] = rows[i]["label"];
+	  curr_row["oid"] = rows[i]["oid"];
+	  curr_row["children"] = [new_row];
+	  curr_row=new_row;
+
+	}
+       console.log(util.inspect(result));
        console.log(util.inspect(err));
-	      for(var i=0; i<rows.length;i++) {
-                node_list['x' + rows[i].id] = {children:[], id:rows[i]['id'], parent_id: rows[i]['parent_id'],oid: rows[i]['oid'],oid_name: rows[i]['oid_name']};
-	        if (rows[i]['parent_id'] != null && rows[i]['id'] != target_id)
-                {
-		    node_list['x' + rows[i]['parent_id']]['children'].push(node_list['x' + rows[i].id]);
-	        }
-                else
-                {
-                   node_heirarchy=node_list['x' + rows[i].id];
-	        } 
-	      }
-        res.json(node_heirarchy);
+        res.json(result);
       }); 
     }); 
 }
