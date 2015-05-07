@@ -56,7 +56,13 @@
 
 <script>
   function loadSubtree(value) {
-	  $('#tree1').tree('loadDataFromUrl','/uptree?oid='+value);
+	  var $tree = $('#tree1');
+	  $tree.tree('loadDataFromUrl','/uptree?oid='+value, null, function() {
+	      $.get("/getId?oid=" + value).done(function(data) {
+	      var node = $tree.tree('getNodeById', data);
+	      $tree.tree('openNode',node, false);
+	      });
+	  });
   }
   $(function() {
     $('.form-inline').on("keyup keypress", function(e) {
@@ -66,9 +72,9 @@
           e.preventDefault();
           return false;
       } });
-      $('#oid_search').change(function() {
-          loadSubtree($('#oid_search').val())
-      });
+      //$('#oid_search').change(function() {
+      //    loadSubtree($('#oid_search').val())
+      //});
       $('#tree1').tree({
       });
   // bind 'tree.click' event

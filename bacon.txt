@@ -1,5 +1,5 @@
-WITH RECURSIVE above_here(x) as (select parent_id from snmpdata where id = 98231
+WITH RECURSIVE above_here(common_parent) as (select parent_id from snmpdata where id = 98231
  union all
- select parent_id from snmpdata, above_here
- where snmpdata.id = above_here.x)
- select id, parent_id, oid, oid_name from snmpdata where id in above_here;
+ select id from snmpdata, above_here
+ where snmpdata.parent_id = above_here.common_parent)
+ select id, parent_id, oid, oid_name from snmpdata where parent_id in above_here;

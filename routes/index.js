@@ -26,9 +26,19 @@ router.get('/query', function(req, res, next) {
 	build_list(res, req.query.node)
       }
 });
+router.get('/getId', function(req, res, next) {
+     var oid = req.query.oid ;
+     query_get_id = "select  id  from snmpdata where oid = \"" +  oid + "\""; 
+     db.all(query_get_id, function(err,rows) {
+	     res.json(rows[0].id)
+     });
+});
 router.get('/uptree', function(req, res, next) {
-    var oid = req.query.oid 
-     query_get_id = "select a.id as id , a.oid_name || \" [\" || a.oid || \"]\" as label, a.oid as oid, count(b.oid_name) > 0  as load_on_demand from snmpdata a left join snmpdata b on a.id = b.parent_id where a.parent_id = " + target_id +" group by a.id,label, a.oid"
+     console.log("Calling uptree2");
+     var oid = req.query.oid ;
+     query_get_id = "select  id  from snmpdata where oid = \"" +  oid + "\""; 
+     console.log("Calling uptree2");
+     console.log( query_get_id);
     db.all(query_get_id, function(err,rows) {
 	  backout(res, rows[0]['id']);
     });
@@ -65,7 +75,9 @@ function backout(res, target_id) {
     node_list = {};
     node_heirarchy = {};
 
-    query = "WITH RECURSIVE above_here(x) as (select parent_id from snmpdata where id = \"" + target_id  + "\" union all select parent_id from snmpdata, above_here where snmpdata.id = above_here.x) select id, parent_id, oid, oid_name from snmpdata where id in above_here; "
+    query = "WITH RECURSIVE above_here(x) as ( values("+ target_id +") union all select parent_id from snmpdata, above_here where snmpdata.parent_id = above_here.x) " + 
+	    "select id , oid_name || \" [\" || oid || \"]\" as label, 1 > 0  as load_on_demand from snmpdata where id in above_here; "; 
+    console.log(query);
     db.serialize(function() { 
 
       console.log(query)
@@ -77,14 +89,13 @@ function backout(res, target_id) {
 	  curr_row["load_on_demand"] = (rows[i]["load_on_demand"] == 1);
 	  curr_row["id"] = rows[i]["id"];
 	  curr_row["label"] = rows[i]["label"];
-	  curr_row["oid"] = rows[i]["oid"];
 	  curr_row["children"] = [new_row];
 	  curr_row=new_row;
 
 	}
        console.log(util.inspect(result));
        console.log(util.inspect(err));
-        res.json(result);
+        res.json([result]);
       }); 
     }); 
 }
