@@ -1,5 +1,5 @@
-WITH RECURSIVE above_here(common_parent) as (select parent_id from snmpdata where id = 98231
- union all
- select id from snmpdata, above_here
- where snmpdata.parent_id = above_here.common_parent)
- select id, parent_id, oid, oid_name from snmpdata where parent_id in above_here;
+
+WITH RECURSIVE above_here(x) as ( values(98224) union all 
+select parent_id from snmpdata, above_here where snmpdata.id = above_here.x) 
+select a.id , a.oid_name || " [" || a.oid || "]" as label, count(*) > 0  as load_on_demand, a.parent_id , b.id is not null children
+from snmpdata a left join snmpdata b on a.id = b.parent_id where (a.id in above_here or a.parent_id in above_here or a.parent_id is null ) group by a.id, a.oid_name, a.oid, a.parent_id  order by a.oid;

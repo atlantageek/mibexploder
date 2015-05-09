@@ -13,7 +13,6 @@ router.get('/details', function(req, res, next) {
   db.serialize(function() {
     db.all("select * from snmpdata where id=" + req.query.node_id, function(err,rows) {
       res.json(rows[0]);
-
     });
   });
 });
@@ -36,11 +35,27 @@ router.get('/getId', function(req, res, next) {
 router.get('/uptree', function(req, res, next) {
      console.log("Calling uptree2");
      var oid = req.query.oid ;
-     query_get_id = "select  id  from snmpdata where oid = \"" +  oid + "\""; 
+     query_get_id = "select  id, parent_id  from snmpdata where oid = \"" +  oid + "\""; 
      console.log("Calling uptree2");
      console.log( query_get_id);
-    db.all(query_get_id, function(err,rows) {
-	  backout(res, rows[0]['id']);
+     db.all(query_get_id, function(err,rows) {
+       if (rows.length > 0) {
+            db.all("select count(*) as cnt from snmpdata where parent_id=" + rows[0]['id'], function(err,rows2) {
+		  if (rows2[0]['cnt'] == 0) {
+			var target_id = rows[0]['parent_id'];
+                        console.log("!!!!!!!!!!!!!!!!!!!!Childless" + target_id);
+	  		backout(res, target_id);
+		  }
+		  else {
+			var target_id = rows[0]['id'];
+                        console.log("!!!!!!!!!!!!!!!!!!!!With Child" + target_id);
+	  		backout(res, target_id);
+		  }
+	  });
+       }
+       else {
+            res.json({status: "FAIL", message: "OID (" + oid  + ") Not Found"});
+       }
     });
 });
 
@@ -65,8 +80,6 @@ function build_list(res, target_id) {
 	  new_row["oid"] = rows[i]["oid"];
           result.push(new_row);
 	}
-       console.log(util.inspect(result));
-       console.log(util.inspect(err));
         res.json(result);
       }); 
     }); 
@@ -75,27 +88,34 @@ function backout(res, target_id) {
     node_list = {};
     node_heirarchy = {};
 
-    query = "WITH RECURSIVE above_here(x) as ( values("+ target_id +") union all select parent_id from snmpdata, above_here where snmpdata.parent_id = above_here.x) " + 
-	    "select id , oid_name || \" [\" || oid || \"]\" as label, 1 > 0  as load_on_demand from snmpdata where id in above_here; "; 
-    console.log(query);
-    db.serialize(function() { 
+    query = "WITH RECURSIVE above_here(x) as ( values("+ target_id +") union all select parent_id from snmpdata, above_here where snmpdata.id = above_here.x) " + 
+	    "select id , oid_name || \" [\" || oid || \"]\" as label, 0 > 0  as load_on_demand, parent_id from snmpdata where (id in above_here or parent_id in above_here or parent_id is null )   order by oid; "; 
+    query = "WITH RECURSIVE above_here(x) as ( values(" + target_id + ") union all " +
+	    "select parent_id from snmpdata, above_here where snmpdata.id = above_here.x) " +
+	    "select a.id , a.oid_name || \" [\" || a.oid || \"]\" as label, count(*) > 0  as load_on_demand, a.parent_id , b.id is not null children " +
+	    "from snmpdata a left join snmpdata b on a.id = b.parent_id where (a.id in above_here or a.parent_id in above_here or a.parent_id is null )   group by a.oid, a.id, a.oid_name, a.parent_id order by a.oid;" ;
 
-      console.log(query)
+    var mibById = {};
+    var mibTree = [];
+    db.serialize(function() { 
+      console.log(query);
       db.all(query, function(err,rows) {
-        var result = {};
-	var curr_row=result;
 	for(i=0;i<rows.length;i++) {
           var new_row={};
-	  curr_row["load_on_demand"] = (rows[i]["load_on_demand"] == 1);
-	  curr_row["id"] = rows[i]["id"];
-	  curr_row["label"] = rows[i]["label"];
-	  curr_row["children"] = [new_row];
-	  curr_row=new_row;
-
+	  new_row["load_on_demand"] = (rows[i]["load_on_demand"] == 1);
+	  new_row["id"] = rows[i]["id"];
+	  new_row["parent_id"] = rows[i]["parent_id"];
+	  new_row["label"] = rows[i]["label"];
+	  new_row["children"] = [];
+	  mibById[new_row["id"]] = new_row;
+	  if (new_row["parent_id"] in mibById) {
+       
+              mibById[new_row["parent_id"]].children.push(new_row);
+	  } else {
+	      mibTree.push(new_row);
+	  }
 	}
-       console.log(util.inspect(result));
-       console.log(util.inspect(err));
-        res.json([result]);
+        res.json({status:"SUCCESS", data: mibTree});
       }); 
     }); 
 }

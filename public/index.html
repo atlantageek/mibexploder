@@ -32,18 +32,22 @@
 
     <div class="container-fluid" style="padding-top:80px;">
 <div class="row">
-<div class="col-md-5">
+<div class="col-md-offset-1 col-md-5">
   <form class="form-inline">
 	  <div class="form-group">
 	      <label for="oid_search">Oid for Search</label>
               <input type="text" class="form-control" id="oid_search" placeholder="Ex: 1.3.6.1.4.1">
 	  </div>
   </form>
-  <div id="tree1" data-url="/query"></div>
+  <div style="color:red;">&nbsp;<span id="status" ></span></div>
+  <div id="tree1" data-url="/query" style="overflow-y:scroll; height:600px;"></div>
 </div>
 <div class="col-md-5" style="padding-top:50px">
-  <h3 id="oid_name"></h3>
-  <h4 id="oid"></h4>
+  <div><span style="font-weight:bold;">NAME: </span><span id="oid_name"></span></div>
+  <div><span style="font-weight:bold;">OID: </span><span id="oid"></span></div>
+  <div><span style="font-weight:bold;">Access: </span><span id="access"></span></div>
+  <div><span style="font-weight:bold;">SNMP Type: </span><span id="snmp_type"></span></div>
+  <h4>Description:</h4>
   <div id="description"></div>
   <span id="oid_description"></span>
 </div>
@@ -57,11 +61,24 @@
 <script>
   function loadSubtree(value) {
 	  var $tree = $('#tree1');
-	  $tree.tree('loadDataFromUrl','/uptree?oid='+value, null, function() {
-	      $.get("/getId?oid=" + value).done(function(data) {
-	      var node = $tree.tree('getNodeById', data);
-	      $tree.tree('openNode',node, false);
+	  $.get('/uptree?oid='+value, null, function(result) {
+              if (result.status == "FAIL") {
+	        $('#status').text(result.message);
+	      }
+	      else {
+	        $('#status').text("");
+	        data = result.data
+	        $tree.tree('loadData',data);
+	        $.get("/getId?oid=" + value).done(function(data) {
+	        var node = $tree.tree('getNodeById', data);
+	        $tree.tree('selectNode',node, false);
+		$tree.tree('scrollToNode', node);
+	        if (node.children.length > 0) {
+	           $tree.tree('openNode',node, false);
+		  }
+  
 	      });
+	    }
 	  });
   }
   $(function() {
@@ -86,6 +103,16 @@
           $.get("/details", {node_id: node.id}).done(function(data) {
             $("#oid").text(data.oid);
             $("#oid_name").text(data.oid_name);
+	    var snmptype="N/A"
+	    if (data.snmp_type!=undefined && data.snmp_type!='') {
+	      snmptype = data.snmp_type
+	    }
+            $("#snmp_type").text(snmptype);
+	    var permissions="N/A"
+	    if (data.access!=undefined && data.access!='') {
+	      permissions = data.access
+	    }
+            $("#access").text(permissions);
             $("#description").text(data.description);
 	  });
       }
