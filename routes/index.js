@@ -16,6 +16,17 @@ router.get('/details', function(req, res, next) {
     });
   });
 });
+ 
+// The page that your contact form is on should have a route like this
+router.post('/contact-save', function(req, res){
+   var name = req.body.name;
+   var email = req.body.email;
+   var comment = req.body.comment;
+   console.log(comment);
+   var stmt = db.prepare("insert into contactdata (name, email, comment) values (?,?,?)");
+   stmt.run(name, email, comment);
+   res.redirect("/");
+});
 
 router.get('/query', function(req, res, next) {
     if (!req.query.node ) {
@@ -29,7 +40,16 @@ router.get('/getId', function(req, res, next) {
      var oid = req.query.oid ;
      query_get_id = "select  id  from snmpdata where oid = \"" +  oid + "\""; 
      db.all(query_get_id, function(err,rows) {
-	     res.json(rows[0].id)
+	     res.json(rows[0].id);
+     });
+
+});
+router.get('/search', function(req, res, next) {
+     query_get_id = "select docid, t.oid_name, t.description, d.oid as oid from snmpdatatext t left join snmpdata d  on docid = id where t.description match '" + req.query.term  +"';"; 
+     console.log(query_get_id);
+     db.all(query_get_id, function(err,rows) {
+	     util.inspect(rows);
+       res.json(rows)
      });
 });
 router.get('/uptree', function(req, res, next) {
@@ -110,6 +130,7 @@ function backout(res, target_id) {
 	  mibById[new_row["id"]] = new_row;
 	  if (new_row["parent_id"] in mibById) {
        
+	      mibById[new_row["parent_id"]].load_on_demand= false;
               mibById[new_row["parent_id"]].children.push(new_row);
 	  } else {
 	      mibTree.push(new_row);

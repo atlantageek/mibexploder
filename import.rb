@@ -5,7 +5,8 @@ db =  SQLite3::Database.new("snmpweb.db")
 
 def file_import (db, filename)
   doc = Nokogiri::XML(File.open(filename))
-  puts "STARTING"
+  mib_name = filename.split('.')[0]
+  puts "STARTING: #{mib_name}"
   doc.xpath('//*[@oid]').each do |node|
 	puts "================================"
 	puts node.name
@@ -33,8 +34,8 @@ def file_import (db, filename)
 		parent_id = firstrow[0].to_i
 	end
 	puts oid
-        db.execute("insert or replace into snmpdata (oid, oid_name, snmp_type, description,parent_id, access) values(?,?,?,?,?, ?)", 
-		  [oid, node_name, node.name, descr, parent_id, access]);
+        db.execute("insert or replace into snmpdata (oid, oid_name, snmp_type, description,parent_id, access, mib_name) values(?,?,?,?,?,?,?)", 
+		  [oid, node_name, node.name, descr, parent_id, access, mib_name]);
 
   end
 end
@@ -73,13 +74,13 @@ def adopt(db, orphan)
 end
 
 Dir.chdir('/tmp')
-#Dir.foreach('/tmp') { |file|
-	#puts ">>>>>>>>>>>>>>>>>>>>>>>>>#{file}"
-	#if file =~ /.xml/
-		#file_import( db, file)
-		file_import( db, "SNMPv2-SMI.xml")
-	#end
-#}
+Dir.foreach('/tmp') { |file|
+	puts ">>>>>>>>>>>>>>>>>>>>>>>>>#{file}"
+	if file =~ /.xml/
+		file_import( db, file)
+		#file_import( db, "SNMPv2-SMI.xml")
+	end
+}
 parentize(db)
 
 
