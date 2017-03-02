@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+<link rel="stylesheet" href="stylesheets/jqtree.css"
+
+<!-- Latest compiled and minified JavaScript -->
+<body>
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Mib.world</a>
+        </div>
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li ><a href="/">Mib Explorer</a></li>
+            <li class="active"><a  href="#">Contact</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+
+    <div class="container-fluid" style="padding-top:120px;">
+<div class="row">
+<div class="col-md-offset-2 col-md-3">
+  <h3>Contact Information</h3>
+  <form class="form-horizontal" action="/contact-save" method="POST">
+  <div class="input-group">
+    <span  id="basic-addon1">Name</span>
+    <input type="text" name="name" class="form-control" >
+  </div>
+  <div class="input-group">
+    <span  id="basic-addon2">Email</span>
+    <input type="text" name="email" class="form-control" ></input>
+  </div>
+  <div class="input-group">
+    <label>Comment</label>
+    <textarea style="width:1000" name="comment" class="form-control" rows="6" placeholder="Comment" ></textarea>
+  </div>
+  <input type="submit">
+  </form>
+</div>
+<div class="col-md-4">
+  <h3>Please Contact Us.</h3>
+  MibExploder is my attempt to make it easier to explore what mibs are available through SNMP. I built the tool I wish I had before and I hope you find it useful.
+ 
+  If you have any ideas of what mibs you'd like to see on mibexploder or what data you would like about the mib. Or just want to tell us what you think of 
+the site then feel free too.
+</div>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="/js/tree.jquery.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+
+<script>
+  function loadSubtree(value) {
+	  var $tree = $('#tree1');
+	  $.get('/uptree?oid='+value, null, function(result) {
+              if (result.status == "FAIL") {
+	        $('#status').text(result.message);
+	      }
+	      else {
+	        $('#status').text("");
+	        data = result.data
+	        $tree.tree('loadData',data);
+	        $.get("/getId?oid=" + value).done(function(data) {
+	        var node = $tree.tree('getNodeById', data);
+	        if (node.children.length > 0) {
+	           $tree.tree('openNode',node, false);
+	        }
+	        $tree.tree('selectNode',node, false);
+	        $tree.tree('scrollToNode', node,true);
+  
+	      });
+	    }
+	  });
+  }
+  function searchlink(event,oid) {
+    $('#modal').modal('hide');
+    loadSubtree(oid);
+    event.preventDefault();
+    return false;
+  }
+  $(function() {
+    //create the modal
+    $('#modal').modal({
+       show: false
+    });
+    $('#oid-form-inline').on("keyup keypress", function(e) {
+      var code = e.keyCode || e.which; 
+      if (code  == 13) {               
+          loadSubtree($('#oid_search').val())
+          e.preventDefault();
+          return false;
+      } });
+    $('#text-form-inline').on("keyup keypress", function(e) {
+      var code = e.keyCode || e.which; 
+      if (code  == 13) {               
+        $.get("/search", {term:$('#text_search').val()}, function(data) {
+          result = "";
+          for(var i=0;i<data.length;i++) {
+            result += '<a onclick=searchlink(event,"' + data[i]['oid'] + '")>' + data[i]['oid_name'] + "</a><br>";
+          }
+          $('#modal .modal-body').html(result);
+          $('#modal').modal('show');
+        });
+
+          return false;
+      } });
+      //$('#oid_search').change(function() {
+      //    loadSubtree($('#oid_search').val())
+      //});
+      $('#tree1').tree({
+      });
+  // bind 'tree.click' event
+  $('#tree1').bind(
+      'tree.click',
+      function(event) {
+          // The clicked node is 'event.node'
+          var node = event.node;
+          $.get("/details", {node_id: node.id}).done(function(data) {
+            $("#oid").text(data.oid);
+            $("#oid_name").text(data.oid_name);
+	    var snmptype="N/A"
+	    if (data.snmp_type!=undefined && data.snmp_type!='') {
+	      snmptype = data.snmp_type
+	    }
+            $("#snmp_type").text(snmptype);
+	    var permissions="N/A"
+	    if (data.access!=undefined && data.access!='') {
+	      permissions = data.access
+	    }
+            $("#access").text(permissions);
+            $("#description").text(data.description);
+	  });
+      }
+  );
+});
+</script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-62983301-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+</body>
