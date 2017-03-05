@@ -1,7 +1,7 @@
 var express = require('express');
 var sqlite  = require('sqlite3').verbose();
 var util    = require('util')
-var db      = new sqlite.Database('snmp.db');
+var db      = new sqlite.Database('snmpweb.db');
 var router = express.Router();
 
 /* GET home page. */

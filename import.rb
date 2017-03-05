@@ -1,33 +1,21 @@
-require 'nokogiri'
 require 'sqlite3'
+require 'json'
 
 db =  SQLite3::Database.new("snmpweb.db")
 
 def file_import (db, filename)
-  doc = Nokogiri::XML(File.open(filename))
+  doc = JSON.parse(File.read(filename))
   mib_name = filename.split('.')[0]
-  puts "STARTING: #{mib_name}"
-  doc.xpath('//*[@oid]').each do |node|
-	puts "================================"
-	puts node.name
-	descr_node = (node > "description")
-	if (descr_node) 
-		descr = descr_node.text
-	else
-		descr = ''
-	end
-	access_node = (node > "access")
-	if (access_node) 
-		access = access_node.text
-	else
-		access = ''
-	end
-	oid = node["oid"]
-	suboid = oid.split(".")
-	suboid.pop()
-	firstrow = db.execute("select id from snmpdata where oid = ?", [suboid.join(".")])[0]
-        puts firstrow
-	node_name = node["name"]
+  doc.each do |key, value|
+     if ((value.class == Hash) && ( value.keys.include?('oid')))
+	 descr = value['description']
+	 access = value['access']
+	 oid = value['oid']
+	 suboid = oid.split(".")
+	 suboid.pop()
+	 firstrow = db.execute("select id from snmpdata where oid = ?", [suboid.join(".")])[0]
+	 puts firstrow
+	 node_name = value['name']
 	if firstrow.nil?
 		parent_id = nil
 	else
@@ -35,8 +23,8 @@ def file_import (db, filename)
 	end
 	puts oid
         db.execute("insert or replace into snmpdata (oid, oid_name, snmp_type, description,parent_id, access, mib_name) values(?,?,?,?,?,?,?)", 
-		  [oid, node_name, node.name, descr, parent_id, access, mib_name]);
-
+		  [oid, node_name, node_name, descr, parent_id, access, mib_name]);
+    end
   end
 end
 
@@ -73,14 +61,13 @@ def adopt(db, orphan)
 	 db.execute("update snmpdata set parent_id=? where id=?;", parent_id, id)
 end
 
-Dir.chdir('/tmp')
-Dir.foreach('/tmp') { |file|
+Dir.chdir('/home/tj/dev/mibexploder/jsonfiles')
+Dir.foreach('/home/tj/dev/mibexploder/jsonfiles') { |file|
 	puts ">>>>>>>>>>>>>>>>>>>>>>>>>#{file}"
-	if file =~ /.xml/
+	if file =~ /.json/
 		file_import( db, file)
 		#file_import( db, "SNMPv2-SMI.xml")
 	end
 }
 parentize(db)
-
 
